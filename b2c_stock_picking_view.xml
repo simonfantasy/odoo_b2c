@@ -16,6 +16,20 @@
 		</field>
 	</record>
 
+
+        <record id="view_b2c_stock_picking_tree_inherit" model="ir.ui.view">
+                <field name="name">b2c.stock.picking.common.view.inherit</field>
+                <field name="model">stock.picking</field>
+                <field name="inherit_id" ref="stock.vpicktree" />
+                <field name="arch" type="xml">
+                        <field name="origin" position="after">
+                               <field name="sp_delivery_name"/>
+                               <field name="sp_delivery_address"/>
+   			       <field name="sp_delivery_phone"/>
+			</field>
+		</field>
+	</record>
+
    </data>
 </openerp>
 

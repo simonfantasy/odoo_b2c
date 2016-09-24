@@ -17,14 +17,14 @@
 	</record>
 
         <record id="view_b2c_sale_order_tree_inherit" model="ir.ui.view">
-                <field name="name">b2c.sale.order.common.view.inherit</field>
+                <field name="name">b2c.sale.order.tree.common.form.inherit</field>
                 <field name="model">sale.order</field>
 		<field name="inherit_id" ref="sale.view_order_tree" />
 		<field name="arch" type="xml">
 			<field name="amount_total" position="after">
 				<field name="order_delivery_name"/>
 				<field name="order_delivery_address"/>
-				<field name="order_delivery_phone"/>
+				<field name="order_deliery_phone"/>
 			</field>
 		</field>
 	</record>
