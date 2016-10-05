@@ -24,7 +24,6 @@ class SaleOrder(models.Model):
     @api.multi
     def show_something_order_line(self):  # for study purpose
         raise UserError(_('%s') % \
-
                         (self.order_line))
 
 

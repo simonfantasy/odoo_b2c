@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #!/usr/bin/env python
-from openerp import models, fields
+from openerp import models, fields, api
 
 class StockPicking(models.Model):
     _inherit = 'stock.picking'
