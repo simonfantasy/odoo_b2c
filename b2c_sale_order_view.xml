@@ -9,9 +9,14 @@
 		<field name="inherit_id" ref="sale.view_order_form" />
 		<field name="arch" type="xml">
 			<field name="payment_term_id" position="after">
+				<field name="b2c_flag"/>
 				<field name="order_delivery_name"/>
 				<field name="order_delivery_address"/>
 				<field name="order_delivery_phone"/>
+			</field>
+			<field name="state" position="before">
+				<button name="show_something" type="object" string="Show self"/>
+				<button name="show_something_order_line" type="object" string="Show self.orderline"/>
 			</field>
 		</field>
 	</record>
@@ -25,6 +30,18 @@
 				<field name="order_delivery_name"/>
 				<field name="order_delivery_address"/>
 				<field name="order_delivery_phone"/>
+			</field>
+		</field>
+	</record>
+
+
+	  <record id="view_res_partner_form_inherit" model="ir.ui.view">
+		<field name="name">res.partner.common.form.inherit</field>
+		<field name="model">res.partner</field>
+		<field name="inherit_id" ref="base.view_partner_form" />
+		<field name="arch" type="xml">
+			<field name="lang" position="after">
+				<field name="b2c_flag"/>
 			</field>
 		</field>
 	</record>
