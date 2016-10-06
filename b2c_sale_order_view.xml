@@ -9,10 +9,11 @@
 		<field name="inherit_id" ref="sale.view_order_form" />
 		<field name="arch" type="xml">
 			<field name="payment_term_id" position="after">
-				<field name="b2c_flag" />
+				<field name="b2c_flag" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
 				<field name="order_delivery_name" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
 				<field name="order_delivery_address" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
 				<field name="order_delivery_phone" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
+                <field name="b2c_delivery_notify" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
 			</field>
 			<field name="state" position="before">
 				<button name="show_something" type="object" string="Show env" groups="base.group_erp_manager"/>

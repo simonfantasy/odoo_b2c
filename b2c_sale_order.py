@@ -9,11 +9,12 @@ class SaleOrder(models.Model):
     order_delivery_name = fields.Char(string='B2C order delivery name', readonly=True, states={'draft': [('readonly', False)], 'sent': [('readonly', False)]})
     order_delivery_address = fields.Char(string='B2C order delivery address', readonly=True, states={'draft': [('readonly', False)], 'sent': [('readonly', False)]})
     order_delivery_phone = fields.Char(string='B2C order delivery phone', readonly=True, states={'draft': [('readonly', False)], 'sent': [('readonly', False)]})
-    b2c_flag = fields.Boolean(related='partner_id.b2c_flag', string="B2C flag", readonly=True, help='Is this for a B2C transactions?')
+    b2c_flag = fields.Boolean(related='partner_id.b2c_flag', string="B2C Order", readonly=True, help='Is this for a B2C transactions?')
         # 添加字段， 只要客户属于B2C，则订单属于B2C，用于筛选条件,用于view的字段可视
+    b2c_delivery_notify = fields.Boolean(string='B2C delivery notified？', default=False, readonly=True)
 
     @api.multi
-    def show_something(self):       # for study purpose, the first method
+    def show_something(self):       # for study purpose, the first method  # for the show env button
         for order in self:
             #order.show_all_sale_order_search()
             #order.show_all_date_time()
@@ -22,16 +23,41 @@ class SaleOrder(models.Model):
 
 
     @api.multi
-    def search_sale_order_date_range(self,start_datetime=fields.Date.today()+' 00:00:00',end_datetime=fields.Date.today()+' 23:59:59'):
-        # 筛选一定时间范围内的SO，默认为系统当天，NOTE：所有时间为本地时间，两个参数为string 'YYYY-MM-DD HH:MM:SS'
+    def search_sale_order_date_range(self, start_datetime=0, day_offset=0, range=0):
+        # 筛选一定时间范围内的SO，默认为系统当天，NOTE：所有时间为本地时间，时间参数为string 'YYYY-MM-DD HH:MM:SS'
+        # range =  [ start_time - day_offset ->  + range]
+        # 其他参数单位为days, range=0 则以当前时刻为end_datetime
+        # default: start_time: 当天00:00:00；  day_offset: 0 days,  end_time: 当前时刻
+
+        if start_datetime is 0:
+            start_datetime = fields.Date.context_today(self)+' 00:00:00'
+            # NOTE: context_today的参数在函数参数里没法调用，因此用这样的方法来定义默认参数
+            #       默认开始时间为当天 00:00:00
+
+        format = "%Y-%m-%d %H:%M:%S"
+        if day_offset:
+            start_datetime=datetime.datetime.strftime(\
+                datetime.datetime.strptime(start_datetime, format) - datetime.timedelta(days=day_offset), format)
+            # NOTE：使用参数day_offset来向前偏移天数，支持小数
+            #       可以不输入start_datetime参数，用day_offset作为昨天、前天、10天前的输入
+
+        if not range:
+            end_datetime = datetime.datetime.strftime(\
+                fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()),format)
+        else:
+            sec_range = range*24*3600 - 0.0001   #timedealta使用秒作为输入，默认= 1天-0.1us，range整数天数结束时不跨天
+            end_datetime = datetime.datetime.strftime(\
+                datetime.datetime.strptime(start_datetime, format) + datetime.timedelta(0, sec_range), format)
+
         order = self.env['sale.order'].sudo().search([])
-        list = '\n'
+
+        list = '\n' # TODO
         for record in order:
-            order_time_CST = fields.Datetime.to_string(fields.Datetime.context_timestamp(self, timestamp=fields.Datetime.from_string(record.date_order)))
-            # if order_time_CST >= start_datetime and order_time_CST <= end_datetime:
-            #     list += record.name
-            list += record.name + ' ' + order_time_CST + ' ' + record.date_order + '\n'
-        raise UserError(_("Filtered Order.name: %s \n\n ") % (list))
+            order_time_CST = fields.Datetime.to_string(\
+                fields.Datetime.context_timestamp(self, timestamp=fields.Datetime.from_string(record.date_order)))
+            if order_time_CST >= start_datetime and order_time_CST <= end_datetime:
+                list += record.name + ' ' + order_time_CST + ' ' + record.date_order + '\n' # TODO
+        raise UserError(_("Filtered Order.name: %s \n %s \n %s \n\n ") % (list, start_datetime, end_datetime))
 
 
     @api.multi
