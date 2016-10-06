@@ -9,15 +9,15 @@
 		<field name="inherit_id" ref="stock.view_picking_form" />
 		<field name="arch" type="xml">
 			<field name="origin" position="after">
-				<field name="sp_delivery_name"/>
-				<field name="sp_delivery_address"/>
-				<field name="sp_delivery_phone"/>
+				<field name="b2c_flag" />
+				<field name="sp_delivery_name" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
+				<field name="sp_delivery_address" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
+				<field name="sp_delivery_phone" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
 			</field>
 		</field>
 	</record>
 
-
-        <record id="view_b2c_stock_picking_tree_inherit" model="ir.ui.view">
+	  <record id="view_b2c_stock_picking_tree_inherit" model="ir.ui.view">
                 <field name="name">b2c.stock.picking.common.view.inherit</field>
                 <field name="model">stock.picking</field>
                 <field name="inherit_id" ref="stock.vpicktree" />
@@ -25,10 +25,10 @@
                         <field name="origin" position="after">
                                <field name="sp_delivery_name"/>
                                <field name="sp_delivery_address"/>
-   			       <field name="sp_delivery_phone"/>
-			</field>
-		</field>
-	</record>
+							   <field name="sp_delivery_phone"/>
+						</field>
+				</field>
+	  </record>
 
    </data>
 </openerp>

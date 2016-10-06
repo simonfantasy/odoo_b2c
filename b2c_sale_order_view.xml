@@ -9,14 +9,14 @@
 		<field name="inherit_id" ref="sale.view_order_form" />
 		<field name="arch" type="xml">
 			<field name="payment_term_id" position="after">
-				<field name="b2c_flag"/>
-				<field name="order_delivery_name"/>
-				<field name="order_delivery_address"/>
-				<field name="order_delivery_phone"/>
+				<field name="b2c_flag" />
+				<field name="order_delivery_name" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
+				<field name="order_delivery_address" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
+				<field name="order_delivery_phone" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
 			</field>
 			<field name="state" position="before">
-				<button name="show_something" type="object" string="Show self"/>
-				<button name="show_something_order_line" type="object" string="Show self.orderline"/>
+				<button name="show_something" type="object" string="Show env" groups="base.group_erp_manager"/>
+				<!--<button name="show_something_order_line" type="object" string="Show self.orderline"/>-->
 			</field>
 		</field>
 	</record>
@@ -40,8 +40,18 @@
 		  <field name="inherit_id" ref="base.view_partner_form" />
 		  <field name="arch" type="xml">
 			  <field name="lang" position="after">
-				  <field name="b2c_flag"/>
-			</field>
+				  <field name="b2c_flag" attrs="{'invisible':[('customer', '!=', True)]}"/>
+			  </field>
+
+               <div name="button_box" position="inside">
+			  		<button name="action_confirm_b2c" type="object" group="base.group_erp_manager"
+					  	    attrs="{'invisible':['|',('b2c_flag', '=', True),('customer', '=', False)]}"
+                            string="Set to B2C" class="oe_stat_button" icon="fa-check"/>
+				   <button name="action_delete_b2c" type="object" group="base.group_erp_manager"
+					  	    attrs="{'invisible':['|',('b2c_flag', '=', False),('customer', '=', False)]}"
+                            string="Unset to B2C" class="oe_stat_button" icon="fa-times"/>
+               </div>
+
 		</field>
       </record>
    </data>
