@@ -5,19 +5,22 @@ from openerp.exceptions import UserError
 import datetime
 from openerp.tools.misc import xlwt
 import re
+import shutil
 from cStringIO import StringIO  # not necessary
 
+
 class SaleOrder(models.Model):
-    _inherit = 'sale.order'	
+    _inherit = 'sale.order'
+
     order_delivery_name = fields.Char(string='B2C order delivery name', readonly=True, states={'draft': [('readonly', False)], 'sent': [('readonly', False)]})
     order_delivery_address = fields.Char(string='B2C order delivery address', readonly=True, states={'draft': [('readonly', False)], 'sent': [('readonly', False)]})
     order_delivery_phone = fields.Char(string='B2C order delivery phone', readonly=True, states={'draft': [('readonly', False)], 'sent': [('readonly', False)]})
     b2c_flag = fields.Boolean(related='partner_id.b2c_flag', string="B2C Order", readonly=True, help='Is this for a B2C transactions?')
         # 添加字段， 只要客户属于B2C，则订单属于B2C，用于筛选条件,用于view的字段可视
-    b2c_delivery_notify = fields.Boolean(string='B2C delivery notified？', default=False, readonly=True)
+    b2c_delivery_notify = fields.Boolean(string='B2C delivery notified？', readonly=True)
 
 
-    @api.multi
+    @api.model
     def search_sale_order_date_range(self, start_datetime=0, day_offset=0, range=0):
         # 筛选一定时间范围内的SO，默认为系统当天，NOTE：所有时间为本地时间，时间参数为string 'YYYY-MM-DD HH:MM:SS'
         # range =  [ start_time - day_offset ->  + range]
@@ -50,26 +53,33 @@ class SaleOrder(models.Model):
         return [order_list, start_datetime, end_datetime]
 
 
-    @api.multi
+    @api.model
     def filter_sale_order_b2c(self, order):
-        order_list = order
-        for record in order:
-            if not record.b2c_flag:
-                order_list -= record
-        return order_list
+        return order.filtered('b2c_flag')
 
 
-    def write_xls(self, c_fields, rows):
+    def write_xls(self, c_fields, rows, filename=0, sheet=[]):
+
+        if not filename:
+            filename = 'Export-' + datetime.datetime.strftime(
+                fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d-%H.%M.%S')\
+                     +'.xls'
+
+        if not sheet:
+            sheet.append('Sheet 1')
+
+
         workbook = xlwt.Workbook()
-        worksheet = workbook.add_sheet(u'B2C订单发运信息汇总')
-
-        for i, fieldname in enumerate(c_fields):    # c_fields是列名的list
-            worksheet.write(0, i, fieldname)
-            worksheet.col(i).width = 300*len(fieldname)    # 按照列名长度设置列宽  BAD
+        for sheetname in sheet:
+            worksheet = workbook.add_sheet(sheetname)
 
         base_style = xlwt.easyxf('align: wrap yes, vert centre, horiz center')
         date_style = xlwt.easyxf('align: wrap yes, vert centre, horiz center', num_format_str='YYYY-MM-DD')
         datetime_style = xlwt.easyxf('align: wrap yes, vert centre, horiz center', num_format_str='YYYY-MM-DD HH:mm:SS')
+
+        for i, fieldname in enumerate(c_fields[0]):    # c_fields是列名的list + 列宽的list
+            worksheet.write(0, i, fieldname, base_style)
+            worksheet.col(i).width = c_fields[1][i]   # 设置列宽
 
         for row_index, row in enumerate(rows):
             for cell_index, cell_value in enumerate(row):
@@ -82,8 +92,73 @@ class SaleOrder(models.Model):
                     cell_style = date_style
                 worksheet.write(row_index + 1, cell_index, cell_value, cell_style)   # +1的意思是c_fields已经占了第一行
 
-        workbook.save('save.xls')
+        workbook.save(filename)
         return workbook
+
+
+    @api.model
+    def update_b2c_customer_list(self):
+        partner = self.env['res.partner'].sudo().search([('customer', '=', True),('b2c_flag', '=', True)])
+        b2c_list = partner.mapped(lambda r: [r.id, r.name, r.email])
+        return b2c_list
+
+
+    @api.model
+    def create_b2c_notification(self):
+        obj = self.env['sale.order']
+        b2c_list = obj.update_b2c_customer_list()
+        order_in_date = obj.search_sale_order_date_range()  #全局搜索在日期范围内的订单
+        order = obj.filter_sale_order_b2c(order_in_date[0])    # 对搜索订单结果进行二次筛选出B2C订单
+        # excel_field = {  # 用于导出Excel的订单字段， 对象field : Excel列名, Excel列宽
+        #     'name': [ u'订单编号', 2500],
+        #     'date_order': [u'订单时间', 5500],
+        #     'order_line.product_id.name': [u'产品名称', 6500],
+        #     'order_line.product_qty': [u'产品数量', 2000],
+        #     'order_delivery_name': [u'收件人', 3000],
+        #     'order_delivery_address': [u'收件地址', 20000],
+        #     'order_delivery_phone': [u'收件电话', 6000]
+        #     }    # 没用到
+        excel_field_keys =['name', 'date_order', 'order_line.product_id.name', 'order_line.product_qty',
+                           'order_delivery_name', 'order_delivery_address', 'order_delivery_phone' ]
+        excel_field = [ [u'订单编号', u'订单时间', u'产品名称', u'产品数量', u'收件人', u'收件地址', u'收件电话'],
+                        [ 2500, 5500, 6500, 2000, 3000, 12000, 4000] ]
+
+        f_order = []
+        rows = []
+        xls_path = './b2cxls/'
+
+        for index, customer in enumerate(b2c_list):
+            f_order.append(order.filtered(lambda r: (r.partner_id.id == customer[0]) and (r.b2c_delivery_notify == False)))
+                #格式化的订单，按照订单客户分类，并只保留没通知发运的订单
+                # NOTE: partner_id是个many2one类型，这样返回的是res.partner对象，必须用res.partner.id来做判断
+            rows.append([])
+
+            for i, record in enumerate(f_order[index]):
+                record.order_line.ensure_one()
+                rows[index].append([])
+                rows[index][i].append(record.name)
+                order_date_cst = fields.Datetime.to_string(
+                    fields.Datetime.context_timestamp(self, timestamp=fields.Datetime.from_string(record.date_order)))
+                rows[index][i].append(order_date_cst)
+                rows[index][i].append(record.order_line.product_id.name)
+                rows[index][i].append(record.order_line.product_qty)
+                rows[index][i].append(record.order_delivery_name)
+                rows[index][i].append(record.order_delivery_address)
+                rows[index][i].append(record.order_delivery_phone)
+
+            if len(rows[index]):
+                filename = b2c_list[index][1] + u'运单信息-' + datetime.datetime.strftime(
+                    fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d-%H.%M.%S')\
+                     + '.xls'
+                sheet = [ b2c_list[index][1] + u'运单' + datetime.datetime.strftime(
+                    fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d %H:%M:%S')]
+                obj.write_xls(excel_field, rows[index], filename, sheet)
+                shutil.move(filename, xls_path+filename)
+                f_order[index].write({"b2c_delivery_notify": True})
+
+        return b2c_list, f_order, rows
+
+
 
 
 ########################### For testing purpose: #################3
@@ -91,11 +166,12 @@ class SaleOrder(models.Model):
     @api.multi
     def show_something(self):  # for study purpose, the first method  # for the show env button
         for order in self:
-            #order.show_all_sale_order_search()
+            pass
+            # order.show_all_sale_order_search()
             # order.show_all_date_time()     # Case 1
             # order.show_order_line()       # Case 2
 
-            ## Case for SO_search_time test
+            # # Case for SO_search_time test
             # show = order.search_sale_order_date_range()
             # show_b2c = order.filter_sale_order_b2c(show[0])
             # raise UserError(_("Returned SO: %s\n\n "
@@ -103,13 +179,25 @@ class SaleOrder(models.Model):
             #                   "Filter b2c SO: %s \n") %
             #                 (show[0],show[1],show[2],show_b2c) )
 
+            # #Case for write_xls test
+            # cfields = [['col-1','col-2','col-3','col-4','col-5'],[2500,5500,6500,5000,6000]]
+            # rrows = [ ['11','12','13','14','15'],
+            #           ['21','22','23','24','25'],
+            #           [u'SO00134', u'2016-09-27 23:59:59.00', u'Propomax无酒精绿蜂胶30ml', u'200', u'xxx']]
+            # workbook = order.write_xls(cfields, rrows)
+            # raise UserError(_("workbook: \n%s") % (workbook))
 
-            #Case for write_xls test
-            cfields = ['col-1','col-2','col-3','col-4','col-5']
-            rrows = [ ['11','12','13','14','15'],
-                     ['21','22','23','24','25']]
-            workbook = order.write_xls(cfields, rrows)
-            raise UserError(_("workbook: \n%s") % (workbook))
+            # # Case for update_b2c_customer_list
+            # l = order.update_b2c_customer_list()
+            # raise UserError(_("B2C list:\n {0}\n".format(l)))
+
+            # # # Case for create_b2c_notification
+            # order.create_b2c_notification()
+            # ## raise UserError(_("B2C List: \n {0} \n\n order: \n {1}\n\n rows:{2}".format(b2c_list, record, rows)))
+            # ## When using write or create, no raise following, otherwise write or create not working
+
+
+
 
 
 
@@ -167,7 +255,7 @@ class ResPartner(models.Model):
                               help='Is this for a B2C transactions?', readonly=True)
 
 
-    @api.one
+    @api.multi
     def action_confirm_b2c(self):
         # if partner.create_uid == self.env.user.id:
         # if self.create_uid.id == self.env.user.id:
@@ -179,7 +267,7 @@ class ResPartner(models.Model):
          #                 (self.create_uid.id,self.env.user.id,self.b2c_flag))   #for test only
 
 
-    @api.one
+    @api.multi
     def action_delete_b2c(self):
         # if partner.create_uid == self.env.user.id:
         # if self.create_uid.id == self.env.user.id:
