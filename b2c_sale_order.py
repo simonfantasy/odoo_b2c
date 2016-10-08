@@ -68,7 +68,6 @@ class SaleOrder(models.Model):
         if not sheet:
             sheet.append('Sheet 1')
 
-
         workbook = xlwt.Workbook()
         for sheetname in sheet:
             worksheet = workbook.add_sheet(sheetname)
@@ -77,7 +76,7 @@ class SaleOrder(models.Model):
         date_style = xlwt.easyxf('align: wrap yes, vert centre, horiz center', num_format_str='YYYY-MM-DD')
         datetime_style = xlwt.easyxf('align: wrap yes, vert centre, horiz center', num_format_str='YYYY-MM-DD HH:mm:SS')
 
-        for i, fieldname in enumerate(c_fields[0]):    # c_fields是列名的list + 列宽的list
+        for i, fieldname in enumerate(c_fields[0]):    # c_fields是列名的list , 列宽的list
             worksheet.write(0, i, fieldname, base_style)
             worksheet.col(i).width = c_fields[1][i]   # 设置列宽
 
@@ -93,7 +92,6 @@ class SaleOrder(models.Model):
                 worksheet.write(row_index + 1, cell_index, cell_value, cell_style)   # +1的意思是c_fields已经占了第一行
 
         workbook.save(filename)
-        return workbook
 
 
     @api.model
@@ -155,10 +153,6 @@ class SaleOrder(models.Model):
                 obj.write_xls(excel_field, rows[index], filename, sheet)
                 shutil.move(filename, xls_path+filename)
                 f_order[index].write({"b2c_delivery_notify": True})
-
-        return b2c_list, f_order, rows
-
-
 
 
 ########################### For testing purpose: #################3
@@ -263,8 +257,6 @@ class ResPartner(models.Model):
             if partner.b2c_flag is False and partner.customer:
                 # self.write({"b2c_flag": True})
                 partner.b2c_flag = True
-         # raise UserError(_('%s,%s,%s') % \
-         #                 (self.create_uid.id,self.env.user.id,self.b2c_flag))   #for test only
 
 
     @api.multi
