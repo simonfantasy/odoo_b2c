@@ -14,6 +14,8 @@
 				<field name="order_delivery_address" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
 				<field name="order_delivery_phone" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
                 <field name="b2c_delivery_notify" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
+				<field name="b2c_sales_notify" attrs="{'invisible':[('b2c_flag', '!=', True)]}"/>
+
 			</field>
 			<field name="state" position="before">
 				<button name="show_something" type="object" string="Show env" groups="base.group_erp_manager"/>
@@ -55,6 +57,29 @@
 
 		</field>
       </record>
-   </data>
+
+
+
+	  <record id="view_ir_attachment_form_inherit" model="ir.ui.view">
+		<field name="name">b2c.ir.attachment.form.inherit</field>
+		<field name="model">ir.attachment</field>
+		<field name="inherit_id" ref="base.view_attachment_form" />
+		<field name="arch" type="xml">
+			<field name="mimetype" position="after">
+				<field name="b2c" attrs="{'invisible':[('b2c', '!=', True)]}"/>
+				<field name="b2c_sent" attrs="{'invisible':[('b2c', '!=', True)]}"/>
+				<field name="b2c_email" attrs="{'invisible':[('b2c', '!=', True)]}"/>
+
+			</field>
+		</field>
+	</record>
+
+
+
+
+
+
+
+  </data>
 </openerp>
 

@@ -6,6 +6,7 @@ import datetime
 from openerp.tools.misc import xlwt
 import re
 import shutil
+import base64
 from cStringIO import StringIO  # not necessary
 
 
@@ -18,6 +19,7 @@ class SaleOrder(models.Model):
     b2c_flag = fields.Boolean(related='partner_id.b2c_flag', string="B2C Order", readonly=True, help='Is this for a B2C transactions?')
         # 添加字段， 只要客户属于B2C，则订单属于B2C，用于筛选条件,用于view的字段可视
     b2c_delivery_notify = fields.Boolean(string='B2C delivery notified？', readonly=True)
+    b2c_sales_notify = fields.Boolean(string='B2C sales notified？', readonly=True)
 
 
     @api.model
@@ -104,6 +106,7 @@ class SaleOrder(models.Model):
     @api.model
     def create_b2c_notification(self):
         obj = self.env['sale.order']
+        attach_obj = self.env['ir.attachment']
         b2c_list = obj.update_b2c_customer_list()
         order_in_date = obj.search_sale_order_date_range()  #全局搜索在日期范围内的订单
         order = obj.filter_sale_order_b2c(order_in_date[0])    # 对搜索订单结果进行二次筛选出B2C订单
@@ -145,22 +148,153 @@ class SaleOrder(models.Model):
                 rows[index][i].append(record.order_delivery_phone)
 
             if len(rows[index]):
+                rows[index].append([])    # 最后加一个合计行
+                formula = 'SUM(D2:D'+str(len(rows[index]))+')'  # -1 +1: -1是因为上面加了1行，+1是因为列名占了第一行
+                count = 'COUNT(D2:D'+str(len(rows[index]))+')'
+                rows[index][i+1].append(u'订单合计：')
+                rows[index][i+1].append(xlwt.Formula(count))
+                rows[index][i+1].append(u'数量合计：')
+                rows[index][i+1].append(xlwt.Formula(formula))
+
                 filename = b2c_list[index][1] + u'运单信息-' + datetime.datetime.strftime(
                     fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d-%H.%M.%S')\
                      + '.xls'
                 sheet = [ b2c_list[index][1] + u'运单' + datetime.datetime.strftime(
                     fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d %H:%M:%S')]
                 obj.write_xls(excel_field, rows[index], filename, sheet)
-                shutil.move(filename, xls_path+filename)
+                full_filename = xls_path+filename
+                shutil.move(filename, full_filename)
                 f_order[index].write({"b2c_delivery_notify": True})
 
+                #below: 把文件重新写到新建的ir.attachment里面
+                f = open(full_filename, 'r')
+                new_attach=attach_obj.create({ 'name': sheet[0],
+                                    'type': 'binary',
+                                    'datas': base64.encodestring(f.read()),
+                                    'datas_fname': filename,
+                                    'b2c': True,
+                                    'b2c_sent': False,
+                                    'b2c_email': customer[2]
+                               })
+                f.close()
+                new_attach.res_id = new_attach.id   # 该attachment的resource是其本身
 
-########################### For testing purpose: #################3
+
+
+    @api.model
+    def create_b2c_sales_summary(self):
+        # obj = self.env['sale.order']
+        # attach_obj = self.env['ir.attachment']
+
+        b2c_sales_group_list = self.env['res.groups'].search([('name', '=', 'B2C sale agent')])   # b2c销售的访问组
+
+        # b2c_sales_group_list.ensure_one()   不能用在这里，在scheduled action里用就出错，ensure_one()针对的是self
+        b2c_user_list = b2c_sales_group_list.users       # 获得访问组里的用户, 如果上一条是multiple records, 这里会报错，不能赋值
+
+        excel_field = [[u'订单编号', u'订单时间', u'产品名称', u'产品数量', u'单价', u'小计', u'收件人', u'收件地址', u'收件电话'],
+                         [ 2500, 5500, 6500, 2000, 2500, 3000, 3000, 12000, 4000] ]
+
+        order = self.env['sale.order'].search([('b2c_flag', '=', True), ('b2c_sales_notify', '=', False)])  # 全部的未汇总的b2c订单
+
+        f_order = []
+        rows = []
+        xls_path = './b2cxls/sale_order/'
+
+        for index, salesman in enumerate(b2c_user_list):
+            f_order.append(order.filtered(lambda r: r.user_id.id == salesman.id))
+                #格式化的订单，按照订单销售分类，并只保留该销售的订单
+                # NOTE: partner_id是个many2one类型，这样返回的是res.partner对象，必须用res.partner.id来做判断
+            rows.append([])
+
+            for i, record in enumerate(f_order[index]):
+                record.order_line.ensure_one()
+                rows[index].append([])
+                rows[index][i].append(record.name)
+                order_date_cst = fields.Datetime.to_string(
+                    fields.Datetime.context_timestamp(self, timestamp=fields.Datetime.from_string(record.date_order)))
+                rows[index][i].append(order_date_cst)
+                rows[index][i].append(record.order_line.product_id.name)
+                rows[index][i].append(record.order_line.product_qty)
+                rows[index][i].append(record.order_line.price_unit)
+                rows[index][i].append(record.order_line.price_total)
+                rows[index][i].append(record.order_delivery_name)
+                rows[index][i].append(record.order_delivery_address)
+                rows[index][i].append(record.order_delivery_phone)
+
+            if len(rows[index]):
+                rows[index].append([])    # 最后加一个合计行
+                formula = 'SUM(D2:D'+str(len(rows[index]))+')'  # -1 +1: -1是因为上面加了1行，+1是因为列名占了第一行
+                count = 'COUNT(D2:D'+str(len(rows[index]))+')'
+                formula2 = 'SUM(F2:F'+str(len(rows[index]))+')'  # -1 +1: -1是因为上面加了1行，+1是因为列名占了第一行
+                rows[index][i+1].append(u'订单合计：')
+                rows[index][i+1].append(xlwt.Formula(count))
+                rows[index][i+1].append(u'数量合计：')
+                rows[index][i+1].append(xlwt.Formula(formula))
+                rows[index][i+1].append(u'价格合计：')
+                rows[index][i+1].append(xlwt.Formula(formula2))
+
+                filename = salesman.name + u'订单汇总-' + datetime.datetime.strftime(
+                    fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d-%H.%M.%S')\
+                     + '.xls'
+                sheet = [salesman.name + u'订单汇总' + datetime.datetime.strftime(
+                    fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d %H:%M:%S')]
+                self.env['sale.order'].write_xls(excel_field, rows[index], filename, sheet)
+                full_filename = xls_path+filename
+                shutil.move(filename, full_filename)
+                f_order[index].write({"b2c_sales_notify": True})
+
+                #below: 把文件重新写到新建的ir.attachment里面
+                f = open(full_filename, 'r')
+                new_attach = self.env['ir.attachment'].create({ 'name': sheet[0],
+                                    'type': 'binary',
+                                    'datas': base64.encodestring(f.read()),
+                                    'datas_fname': filename,
+                                    'b2c': True,
+                                    'b2c_sent': False,
+                                    'b2c_email': salesman.email
+                               })
+                f.close()
+                new_attach.res_id = new_attach.id   # 该attachment的resource是其本身
+
+
+
+    @api.model
+    def b2c_send_email(self):
+        b2c_attachment_to_send = self.env['ir.attachment']. \
+            search([('b2c', '=', True), ('b2c_sent', '=', False)])
+
+        email_list = b2c_attachment_to_send.mapped('b2c_email')  # 用tosend的attachment中的email作为索引
+        email_list = list(set(email_list))  # 合并相同邮件地址
+
+        mail_template = self.env['mail.template'].search([('name', '=', 'B2C_Send_Mail')])
+
+        for index, email_address in enumerate(email_list):
+            attachment = b2c_attachment_to_send.filtered(lambda r: r.b2c_email == email_list[index])
+            mail_dict = mail_template.generate_email(
+                0)  # 返回的是mail字段字典 # mail.template用记录的resource，对应res_id的那个记录的report作为附件
+            mail_dict['email_to'] = email_list[index]
+            email = self.env['mail.mail'].create(mail_dict)
+            email.mail_message_id.write({'attachment_ids': [(4, attachment.mapped('id'))]})
+
+        b2c_attachment_to_send.write({'b2c_sent': True})
+
+
+                ########################### For testing purpose: #################3
 
     @api.multi
     def show_something(self):  # for study purpose, the first method  # for the show env button
         for order in self:
-            pass
+
+           # # Test Case from xls file to ir.attachment
+           #  f = open('./b2cxls/B2C运单信息-20161009-00.53.23.xls', 'r')
+           #  attach_obj = self.env['ir.attachment']
+           #  attach_obj.create({'name': 'b2c del',
+           #                     'type': 'binary',
+           #                     'datas': base64.encodestring(f.read()),
+           #                     'datas_fname': 'B2C运单信息-20161009-00.53.23.xl'
+           #                     })
+           #  f.close()
+
             # order.show_all_sale_order_search()
             # order.show_all_date_time()     # Case 1
             # order.show_order_line()       # Case 2
@@ -181,7 +315,7 @@ class SaleOrder(models.Model):
             # workbook = order.write_xls(cfields, rrows)
             # raise UserError(_("workbook: \n%s") % (workbook))
 
-            # # Case for update_b2c_customer_list
+            # Case for update_b2c_customer_list
             # l = order.update_b2c_customer_list()
             # raise UserError(_("B2C list:\n {0}\n".format(l)))
 
@@ -191,8 +325,13 @@ class SaleOrder(models.Model):
             # ## When using write or create, no raise following, otherwise write or create not working
 
 
+            # Case for email generating test
+            # order.b2c_send_email()
 
+            pass
 
+            # Case for b2c sale summary
+            # order.create_b2c_sales_summary()
 
 
     @api.multi
@@ -267,4 +406,16 @@ class ResPartner(models.Model):
             if partner.b2c_flag and partner.customer:
                 # self.write({"b2c_flag": False })
                 partner.b2c_flag = False
+
+
+
+class IrAttachmentB2C(models.Model):
+    _inherit = 'ir.attachment'
+
+
+    b2c = fields.Boolean(string='B2C', help= 'A B2C order\'s delivery list', readonly=True, default= False)
+    b2c_sent = fields.Boolean(string='B2C sent', readonly=True, default= False)
+    b2c_email = fields.Char(string= 'B2C email', readonly=True)
+
+
 
