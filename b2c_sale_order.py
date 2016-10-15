@@ -135,7 +135,8 @@ class SaleOrder(models.Model):
             rows.append([])
 
             for i, record in enumerate(f_order[index]):
-                record.order_line.ensure_one()
+                if len(record.order_line) != 1:
+                    break
                 rows[index].append([])
                 rows[index][i].append(record.name)
                 order_date_cst = fields.Datetime.to_string(
@@ -207,7 +208,8 @@ class SaleOrder(models.Model):
             rows.append([])
 
             for i, record in enumerate(f_order[index]):
-                record.order_line.ensure_one()
+                if len(record.order_line) != 1:
+                    break
                 rows[index].append([])
                 rows[index][i].append(record.name)
                 order_date_cst = fields.Datetime.to_string(
