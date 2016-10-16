@@ -68,10 +68,9 @@ class SaleOrder(models.Model):
                      +'.xls'
 
         if not xls_path:
-            proxy = self.pool['ir.config_parameter']
-            xls_path = proxy.get_param(cursor, SUPERUSER_ID, 'xls_path')
+            xls_path = self.env['ir.config_parameter'].search([('key', '=', 'xls_path')]).value
 
-        os.chdir(xls_path)
+        os.chdir(xls_path)  # todo add Exceptions
 
         raise UserError(_("{0}\n".format(os.getcwd())))
 
