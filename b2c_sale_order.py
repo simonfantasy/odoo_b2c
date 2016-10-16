@@ -187,7 +187,7 @@ class SaleOrder(models.Model):
         # obj = self.env['sale.order']
         # attach_obj = self.env['ir.attachment']
 
-        b2c_sales_group_list = self.env['res.groups'].search([('name', '=', 'B2C sale agent')])   # b2c销售的访问组
+        b2c_sales_group_list = self.env['res.groups'].search([('name', '=', u'B2C sale agent')])   # b2c销售的访问组
 
         # b2c_sales_group_list.ensure_one()   不能用在这里，在scheduled action里用就出错，ensure_one()针对的是self
         b2c_user_list = b2c_sales_group_list.users       # 获得访问组里的用户, 如果上一条是multiple records, 这里会报错，不能赋值
@@ -200,6 +200,8 @@ class SaleOrder(models.Model):
         f_order = []
         rows = []
         xls_path = './b2cxls/sale_order/'
+
+        raise UserError(_("{0}".format(b2c_sales_group_list)))
 
         for index, salesman in enumerate(b2c_user_list):
             f_order.append(order.filtered(lambda r: r.user_id.id == salesman.id))
@@ -330,10 +332,10 @@ class SaleOrder(models.Model):
             # Case for email generating test
             # order.b2c_send_email()
 
-            pass
+            # pass
 
             # Case for b2c sale summary
-            # order.create_b2c_sales_summary()
+            order.create_b2c_sales_summary()
 
 
     @api.multi
