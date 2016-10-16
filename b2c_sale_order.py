@@ -131,7 +131,7 @@ class SaleOrder(models.Model):
 
         f_order = []
         rows = []
-        xls_path = './b2cxls/'
+        # xls_path = './b2cxls/'
 
         for index, customer in enumerate(b2c_list):
             f_order.append(order.filtered(lambda r: (r.partner_id.id == customer[0]) and (r.b2c_delivery_notify == False)))
@@ -205,7 +205,7 @@ class SaleOrder(models.Model):
 
         f_order = []
         rows = []
-        xls_path = './b2cxls/sale_order/'
+        # xls_path = './b2cxls/sale_order/'
 
 
         for index, salesman in enumerate(b2c_user_list):
@@ -259,11 +259,11 @@ class SaleOrder(models.Model):
                 f_order[index].write({"b2c_sales_notify": True})
 
                 #below: 把文件重新写到新建的ir.attachment里面
-                f = open(filename, 'r')
+                f = open(filename.encode('utf-8'), 'r')
                 new_attach = self.env['ir.attachment'].create({ 'name': sheet[0],
                                     'type': 'binary',
                                     'datas': base64.encodestring(f.read()),
-                                    'datas_fname': filename,
+                                    'datas_fname': filename.encode('utf-8'),
                                     'b2c': True,
                                     'b2c_sent': False,
                                     'b2c_email': salesman.email
