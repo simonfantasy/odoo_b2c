@@ -8,6 +8,7 @@ import re
 import shutil
 import base64
 from cStringIO import StringIO  # not necessary
+import os
 
 
 class SaleOrder(models.Model):
@@ -92,6 +93,8 @@ class SaleOrder(models.Model):
                     cell_style = date_style
                 worksheet.write(row_index + 1, cell_index, cell_value, cell_style)   # +1的意思是c_fields已经占了第一行
 
+        raise UserError(_("{0}\n".format(os.getcwd())))
+        
         workbook.save(filename.encode('utf-8'))
 
 
@@ -239,13 +242,16 @@ class SaleOrder(models.Model):
                     .format(salesman.name.encode('utf-8'),  datetime.datetime.strftime(
                     fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d-%H.%M.%S') )
                         # 这是个utf-8字符串，下面处理标准io时，因为python默认ascii，遇到中文可能出问题，需要注意
+                        # 在write_xls里加入对filename.encode('utf-8")
 
                 sheet = [salesman.name + u'订单汇总' + datetime.datetime.strftime(
                     fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d %H:%M:%S')]
 
                 self.env['sale.order'].write_xls(excel_field, rows[index], filename, sheet)
-                full_filename = xls_path+filename
-                shutil.move(filename, full_filename)
+
+                # full_filename = xls_path+filename
+                # shutil.move(filename, full_filename)
+
                 f_order[index].write({"b2c_sales_notify": True})
 
                 #below: 把文件重新写到新建的ir.attachment里面
