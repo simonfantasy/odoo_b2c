@@ -168,6 +168,7 @@ class SaleOrder(models.Model):
                 sheet = [ b2c_list[index][1] + u'运单' + datetime.datetime.strftime(
                     fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d %H:%M:%S')]
                 obj.write_xls(excel_field, rows[index], filename, sheet)
+
                 full_filename = xls_path+filename
                 shutil.move(filename, full_filename)
                 f_order[index].write({"b2c_delivery_notify": True})
@@ -258,7 +259,7 @@ class SaleOrder(models.Model):
                 f_order[index].write({"b2c_sales_notify": True})
 
                 #below: 把文件重新写到新建的ir.attachment里面
-                f = open(full_filename, 'r')
+                f = open(filename, 'r')
                 new_attach = self.env['ir.attachment'].create({ 'name': sheet[0],
                                     'type': 'binary',
                                     'datas': base64.encodestring(f.read()),
