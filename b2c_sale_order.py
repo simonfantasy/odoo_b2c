@@ -72,8 +72,6 @@ class SaleOrder(models.Model):
 
         os.chdir(xls_path)  # todo add Exceptions
 
-        raise UserError(_("{0}\n".format(os.getcwd())))
-
         if not sheet:
             sheet.append('Sheet 1')
 
