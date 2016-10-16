@@ -61,7 +61,6 @@ class SaleOrder(models.Model):
 
 
     def write_xls(self, c_fields, rows, filename=0, sheet=[]):
-
         if not filename:
             filename = 'Export-' + datetime.datetime.strftime(
                 fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d-%H.%M.%S')\
@@ -93,7 +92,7 @@ class SaleOrder(models.Model):
                     cell_style = date_style
                 worksheet.write(row_index + 1, cell_index, cell_value, cell_style)   # +1的意思是c_fields已经占了第一行
 
-        workbook.save(filename)
+        workbook.save(filename.encode('utf-8'))
 
 
     @api.model
@@ -201,7 +200,6 @@ class SaleOrder(models.Model):
         rows = []
         xls_path = './b2cxls/sale_order/'
 
-        raise UserError(_("{0}".format(b2c_sales_group_list)))
 
         for index, salesman in enumerate(b2c_user_list):
             f_order.append(order.filtered(lambda r: r.user_id.id == salesman.id))
@@ -210,8 +208,8 @@ class SaleOrder(models.Model):
             rows.append([])
 
             for i, record in enumerate(f_order[index]):
-                if len(record.order_line) != 1:
-                    break
+                # if len(record.order_line) != 1:
+                #     break
                 rows[index].append([])
                 rows[index][i].append(record.name)
                 order_date_cst = fields.Datetime.to_string(
@@ -237,11 +235,14 @@ class SaleOrder(models.Model):
                 rows[index][i+1].append(u'价格合计：')
                 rows[index][i+1].append(xlwt.Formula(formula2))
 
-                filename = salesman.name + u'订单汇总-' + datetime.datetime.strftime(
-                    fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d-%H.%M.%S')\
-                     + '.xls'
+                filename = u'{0}订单汇总-{1}.xls'\
+                    .format(salesman.name.encode('utf-8'),  datetime.datetime.strftime(
+                    fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d-%H.%M.%S') )
+                        # 这是个utf-8字符串，下面处理标准io时，因为python默认ascii，遇到中文可能出问题，需要注意
+
                 sheet = [salesman.name + u'订单汇总' + datetime.datetime.strftime(
                     fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d %H:%M:%S')]
+
                 self.env['sale.order'].write_xls(excel_field, rows[index], filename, sheet)
                 full_filename = xls_path+filename
                 shutil.move(filename, full_filename)
