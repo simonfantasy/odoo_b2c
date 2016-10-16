@@ -131,7 +131,7 @@ class SaleOrder(models.Model):
 
         f_order = []
         rows = []
-        # xls_path = './b2cxls/'
+        xls_path = './dn/'    # xls目录在系统参数里设定，这里是二级目录
 
         for index, customer in enumerate(b2c_list):
             f_order.append(order.filtered(lambda r: (r.partner_id.id == customer[0]) and (r.b2c_delivery_notify == False)))
@@ -140,8 +140,8 @@ class SaleOrder(models.Model):
             rows.append([])
 
             for i, record in enumerate(f_order[index]):
-                if len(record.order_line) != 1:
-                    break
+                # if len(record.order_line) != 1:
+                #     break       #todo add exceptions
                 rows[index].append([])
                 rows[index][i].append(record.name)
                 order_date_cst = fields.Datetime.to_string(
@@ -162,23 +162,24 @@ class SaleOrder(models.Model):
                 rows[index][i+1].append(u'数量合计：')
                 rows[index][i+1].append(xlwt.Formula(formula))
 
-                filename = b2c_list[index][1] + u'运单信息-' + datetime.datetime.strftime(
-                    fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d-%H.%M.%S')\
-                     + '.xls'
+                filename = u'{0}运单信息-{1}.xls'\
+                    .format(b2c_list[index][1],  datetime.datetime.strftime(
+                    fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d-%H.%M.%S') )
+
                 sheet = [ b2c_list[index][1] + u'运单' + datetime.datetime.strftime(
                     fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d %H:%M:%S')]
-                obj.write_xls(excel_field, rows[index], filename, sheet)
 
                 full_filename = xls_path+filename
-                shutil.move(filename, full_filename)
+                obj.write_xls(excel_field, rows[index], full_filename, sheet)
+
                 f_order[index].write({"b2c_delivery_notify": True})
 
                 #below: 把文件重新写到新建的ir.attachment里面
-                f = open(full_filename, 'r')
+                f = open(full_filename.encode('utf-8'), 'r')
                 new_attach=attach_obj.create({ 'name': sheet[0],
                                     'type': 'binary',
                                     'datas': base64.encodestring(f.read()),
-                                    'datas_fname': filename,
+                                    'datas_fname': filename.encode('utf-8'),
                                     'b2c': True,
                                     'b2c_sent': False,
                                     'b2c_email': customer[2]
@@ -205,7 +206,7 @@ class SaleOrder(models.Model):
 
         f_order = []
         rows = []
-        # xls_path = './b2cxls/sale_order/'
+        xls_path = './so/'    # xls目录在系统参数里设定，这里是二级目录
 
 
         for index, salesman in enumerate(b2c_user_list):
@@ -216,7 +217,7 @@ class SaleOrder(models.Model):
 
             for i, record in enumerate(f_order[index]):
                 # if len(record.order_line) != 1:
-                #     break
+                #     break    # todo add exceptions
                 rows[index].append([])
                 rows[index][i].append(record.name)
                 order_date_cst = fields.Datetime.to_string(
@@ -251,15 +252,15 @@ class SaleOrder(models.Model):
                 sheet = [salesman.name + u'订单汇总' + datetime.datetime.strftime(
                     fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d %H:%M:%S')]
 
-                self.env['sale.order'].write_xls(excel_field, rows[index], filename, sheet)
+                full_filename = xls_path+filename
+                self.env['sale.order'].write_xls(excel_field, rows[index], full_filename, sheet)
 
-                # full_filename = xls_path+filename
                 # shutil.move(filename, full_filename)
 
                 f_order[index].write({"b2c_sales_notify": True})
 
                 #below: 把文件重新写到新建的ir.attachment里面
-                f = open(filename.encode('utf-8'), 'r')
+                f = open(full_filename.encode('utf-8'), 'r')
                 new_attach = self.env['ir.attachment'].create({ 'name': sheet[0],
                                     'type': 'binary',
                                     'datas': base64.encodestring(f.read()),
