@@ -61,11 +61,19 @@ class SaleOrder(models.Model):
         return order.filtered('b2c_flag')
 
 
-    def write_xls(self, c_fields, rows, filename=0, sheet=[]):
+    def write_xls(self, c_fields, rows, filename=0, sheet=[], xls_path=''):
         if not filename:
             filename = 'Export-' + datetime.datetime.strftime(
                 fields.Datetime.context_timestamp(self, timestamp=datetime.datetime.now()), '%Y%m%d-%H.%M.%S')\
                      +'.xls'
+
+        if not xls_path:
+            proxy = self.pool['ir.config_parameter']
+            xls_path = proxy.get_param(cursor, SUPERUSER_ID, 'xls_path')
+
+        os.chdir(xls_path)
+
+        raise UserError(_("{0}\n".format(os.getcwd())))
 
         if not sheet:
             sheet.append('Sheet 1')
@@ -93,8 +101,6 @@ class SaleOrder(models.Model):
                     cell_style = date_style
                 worksheet.write(row_index + 1, cell_index, cell_value, cell_style)   # +1的意思是c_fields已经占了第一行
 
-        raise UserError(_("{0}\n".format(os.getcwd())))
-        
         workbook.save(filename.encode('utf-8'))
 
 
