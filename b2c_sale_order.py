@@ -344,10 +344,10 @@ class SaleOrder(models.Model):
             # Case for email generating test
             # order.b2c_send_email()
 
-            # pass
+            pass
 
             # Case for b2c sale summary
-            order.create_b2c_sales_summary()
+            # order.create_b2c_sales_summary()
 
 
     @api.multi
